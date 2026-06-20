@@ -876,187 +876,224 @@ footer {
 
 <script>
 // ══════════════════════════════════════════
-// UNDERWATER CANVAS ENGINE
+// DEEP SEA CANVAS ENGINE
 // ══════════════════════════════════════════
 const uw = document.getElementById('underwaterCanvas');
 const uctx = uw.getContext('2d');
 let UW, UH, uwT = 0;
+let uwJellies = [], uwOrbs = [], uwPlankton = [], uwSilhouettes = [];
 
 function uwResize() {
   UW = uw.width  = window.innerWidth;
   UH = uw.height = window.innerHeight;
+  uwJellies    = Array.from({ length: 7  }, () => { const j = mkJelly();  j.y = Math.random() * UH * 1.5 - UH * 0.3; return j; });
+  uwOrbs       = Array.from({ length: 35 }, () => mkOrb());
+  uwPlankton   = Array.from({ length: 80 }, () => mkPlankton());
+  uwSilhouettes= Array.from({ length: 4  }, () => { const s = mkSilhouette(); s.x = Math.random() * UW; return s; });
 }
-uwResize();
-window.addEventListener('resize', uwResize);
 
-// ── Bubbles ──
-const uwBubbles = Array.from({ length: 40 }, () => mkUwBubble());
-function mkUwBubble() {
+function mkJelly() {
+  const hue = [180, 200, 270, 300][Math.floor(Math.random() * 4)];
   return {
     x: Math.random() * (UW || 800),
-    y: (UH || 600) + Math.random() * 200,
-    r: Math.random() * 7 + 2,
-    speed: Math.random() * 0.6 + 0.25,
-    wobble: Math.random() * Math.PI * 2,
-    wobbleSpeed: Math.random() * 0.025 + 0.008,
-    alpha: Math.random() * 0.35 + 0.1,
+    y: (UH || 600) + Math.random() * 200 + 80,
+    r: Math.random() * 28 + 14,
+    hue,
+    phase: Math.random() * Math.PI * 2,
+    pulseSpeed: Math.random() * 0.018 + 0.008,
+    driftX: (Math.random() - 0.5) * 0.3,
+    riseSpeed: Math.random() * 0.22 + 0.08,
+    alpha: Math.random() * 0.35 + 0.3,
+    tentacles: Array.from({ length: 6 }, () => ({
+      angle: Math.random() * Math.PI * 2,
+      len: Math.random() * 35 + 20,
+      wobble: Math.random() * Math.PI * 2,
+    })),
   };
 }
 
-// ── Fish ──
-const FISH_PALETTE = [
-  { body: '#ff6020', fin: '#ffcc00' },
-  { body: '#ffcc00', fin: '#ff8800' },
-  { body: '#4cbbd4', fin: '#ffffff' },
-  { body: '#ff4488', fin: '#ffaacc' },
-  { body: '#44ddaa', fin: '#00aa77' },
-  { body: '#ff8844', fin: '#ffddaa' },
-  { body: '#bb55ff', fin: '#ddbbff' },
-];
-const uwFish = Array.from({ length: 14 }, () => mkUwFish());
-function mkUwFish() {
-  const dir = Math.random() < 0.5 ? 1 : -1;
-  const size = Math.random() * 18 + 9;
-  const col = FISH_PALETTE[Math.floor(Math.random() * FISH_PALETTE.length)];
+function mkOrb() {
   return {
-    x: dir === 1 ? -(size * 5) : (UW || 800) + size * 5,
-    y: Math.random() * (UH || 600) * 0.8 + (UH || 600) * 0.05,
-    size, dir,
-    speed: Math.random() * 1.0 + 0.35,
-    tailPhase: Math.random() * Math.PI * 2,
-    tailSpeed: Math.random() * 0.07 + 0.04,
-    wobblePhase: Math.random() * Math.PI * 2,
-    body: col.body,
-    fin: col.fin,
-    alpha: Math.random() * 0.25 + 0.65,
+    x: Math.random() * (UW || 800),
+    y: Math.random() * (UH || 600),
+    r: Math.random() * 3 + 1,
+    hue: [160, 180, 200, 260, 280][Math.floor(Math.random() * 5)],
+    phase: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.015 + 0.005,
+    alpha: Math.random() * 0.5 + 0.2,
+    driftX: (Math.random() - 0.5) * 0.18,
+    driftY: (Math.random() - 0.5) * 0.1,
   };
 }
 
-// ── Caustic light rays ──
-function drawCaustics() {
+function mkPlankton() {
+  return {
+    x: Math.random() * (UW || 800),
+    y: Math.random() * (UH || 600),
+    r: Math.random() * 1.8 + 0.4,
+    hue: 160 + Math.random() * 120,
+    phase: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.012 + 0.004,
+    alpha: Math.random() * 0.6 + 0.2,
+    driftX: (Math.random() - 0.5) * 0.12,
+    driftY: (Math.random() - 0.5) * 0.08,
+  };
+}
+
+function mkSilhouette() {
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  return {
+    x: dir === 1 ? -120 : (UW || 800) + 120,
+    y: Math.random() * (UH || 600) * 0.7 + (UH || 600) * 0.1,
+    dir,
+    speed: Math.random() * 0.18 + 0.06,
+    size: Math.random() * 22 + 12,
+    alpha: Math.random() * 0.12 + 0.05,
+    wobble: Math.random() * Math.PI * 2,
+    wobbleSpeed: Math.random() * 0.015 + 0.005,
+  };
+}
+
+function drawJelly(j) {
+  const pulse = 0.85 + 0.15 * Math.sin(j.phase);
+  const cr = j.r * pulse;
   uctx.save();
-  uctx.globalAlpha = 0.018 + 0.008 * Math.sin(uwT * 0.009);
-  for (let i = 0; i < 9; i++) {
-    const rx = UW * (0.05 + i * 0.11) + Math.sin(uwT * 0.007 + i * 1.1) * 28;
-    const g = uctx.createLinearGradient(rx, 0, rx + 40, UH * 0.65);
-    g.addColorStop(0, 'rgba(76,155,182,0.9)');
-    g.addColorStop(1, 'rgba(0,40,80,0)');
+  uctx.globalAlpha = j.alpha;
+
+  const glow = uctx.createRadialGradient(j.x, j.y, 0, j.x, j.y, cr * 2.2);
+  glow.addColorStop(0, `hsla(${j.hue},100%,70%,0.18)`);
+  glow.addColorStop(1, `hsla(${j.hue},100%,60%,0)`);
+  uctx.beginPath();
+  uctx.arc(j.x, j.y, cr * 2.2, 0, Math.PI * 2);
+  uctx.fillStyle = glow;
+  uctx.fill();
+
+  const bell = uctx.createRadialGradient(j.x, j.y - cr * 0.2, cr * 0.1, j.x, j.y, cr);
+  bell.addColorStop(0, `hsla(${j.hue},100%,85%,0.65)`);
+  bell.addColorStop(0.5, `hsla(${j.hue},90%,60%,0.35)`);
+  bell.addColorStop(1, `hsla(${j.hue},80%,40%,0.05)`);
+  uctx.beginPath();
+  uctx.ellipse(j.x, j.y, cr, cr * 0.62, 0, Math.PI, Math.PI * 2);
+  uctx.fillStyle = bell;
+  uctx.fill();
+
+  uctx.beginPath();
+  uctx.ellipse(j.x - cr * 0.15, j.y - cr * 0.28, cr * 0.35, cr * 0.2, -0.3, 0, Math.PI * 2);
+  uctx.fillStyle = `hsla(${j.hue},100%,95%,0.15)`;
+  uctx.fill();
+
+  j.tentacles.forEach((ten, i) => {
+    ten.wobble += 0.02;
+    const tx = j.x + Math.cos(ten.angle + Math.sin(uwT * 0.012) * 0.5) * cr * 0.55;
+    const ty = j.y + cr * 0.05;
+    const ey = ty + ten.len * pulse;
     uctx.beginPath();
-    uctx.moveTo(rx, 0);
-    uctx.lineTo(rx + 45 + Math.sin(uwT * 0.006 + i) * 18, UH * 0.65);
-    uctx.lineTo(rx - 8  + Math.cos(uwT * 0.006 + i) * 18, UH * 0.65);
-    uctx.closePath();
-    uctx.fillStyle = g;
-    uctx.fill();
-  }
+    uctx.moveTo(tx, ty);
+    uctx.quadraticCurveTo(tx + Math.sin(ten.wobble + i) * 8, (ty + ey) / 2, tx + Math.sin(ten.wobble) * 6, ey);
+    uctx.strokeStyle = `hsla(${j.hue},100%,75%,0.4)`;
+    uctx.lineWidth = 0.8;
+    uctx.stroke();
+  });
+
   uctx.restore();
 }
 
-// ── Draw a single fish ──
-function drawFish(f) {
+function drawOrb(o) {
+  const a = o.alpha * (0.6 + 0.4 * Math.sin(o.phase));
   uctx.save();
-  uctx.globalAlpha = f.alpha;
-  uctx.translate(f.x, f.y);
-  uctx.scale(f.dir, 1);
-
-  const s = f.size;
-  const tw = Math.sin(f.tailPhase) * 0.38;
-
-  // Tail
-  uctx.save();
-  uctx.translate(-s, 0);
-  uctx.rotate(tw);
+  const g = uctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r * 3);
+  g.addColorStop(0, `hsla(${o.hue},100%,80%,${a})`);
+  g.addColorStop(0.4, `hsla(${o.hue},100%,65%,${a * 0.5})`);
+  g.addColorStop(1, `hsla(${o.hue},100%,50%,0)`);
   uctx.beginPath();
-  uctx.moveTo(0, 0);
-  uctx.lineTo(-s * 0.85, -s * 0.45);
-  uctx.lineTo(-s * 0.85,  s * 0.45);
+  uctx.arc(o.x, o.y, o.r * 3, 0, Math.PI * 2);
+  uctx.fillStyle = g;
+  uctx.fill();
+  uctx.restore();
+}
+
+function drawPlankton(p) {
+  const a = p.alpha * (0.5 + 0.5 * Math.sin(p.phase));
+  uctx.save();
+  uctx.globalAlpha = a;
+  uctx.beginPath();
+  uctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+  uctx.fillStyle = `hsl(${p.hue},100%,75%)`;
+  uctx.shadowColor = `hsl(${p.hue},100%,70%)`;
+  uctx.shadowBlur = p.r * 4;
+  uctx.fill();
+  uctx.restore();
+}
+
+function drawSilhouette(s) {
+  uctx.save();
+  uctx.globalAlpha = s.alpha;
+  uctx.translate(s.x, s.y + Math.sin(s.wobble) * 4);
+  uctx.scale(s.dir, 1);
+  const sz = s.size;
+  uctx.beginPath();
+  uctx.ellipse(0, 0, sz, sz * 0.38, 0, 0, Math.PI * 2);
+  uctx.moveTo(-sz, 0);
+  uctx.lineTo(-sz * 1.6, -sz * 0.4);
+  uctx.lineTo(-sz * 1.6,  sz * 0.4);
   uctx.closePath();
-  uctx.fillStyle = f.body;
-  uctx.fill();
-  uctx.restore();
-
-  // Body
-  uctx.beginPath();
-  uctx.ellipse(0, 0, s, s * 0.48, 0, 0, Math.PI * 2);
-  uctx.fillStyle = f.body;
-  uctx.fill();
-
-  // Belly highlight
-  uctx.beginPath();
-  uctx.ellipse(s * 0.1, s * 0.12, s * 0.55, s * 0.22, 0.15, 0, Math.PI * 2);
-  uctx.fillStyle = 'rgba(255,255,255,0.18)';
-  uctx.fill();
-
-  // Dorsal fin
-  uctx.beginPath();
-  uctx.moveTo(-s * 0.1, -s * 0.22);
-  uctx.lineTo( s * 0.25, -s * 0.65);
-  uctx.lineTo( s * 0.55, -s * 0.22);
-  uctx.closePath();
-  uctx.fillStyle = f.fin;
-  uctx.globalAlpha = f.alpha * 0.75;
-  uctx.fill();
-  uctx.globalAlpha = f.alpha;
-
-  // Eye
-  uctx.beginPath();
-  uctx.arc(s * 0.55, -s * 0.06, s * 0.13, 0, Math.PI * 2);
-  uctx.fillStyle = '#fff';
-  uctx.fill();
-  uctx.beginPath();
-  uctx.arc(s * 0.57, -s * 0.06, s * 0.07, 0, Math.PI * 2);
-  uctx.fillStyle = '#111';
-  uctx.fill();
-
-  uctx.restore();
-}
-
-// ── Draw a bubble ──
-function drawUwBubble(b) {
-  uctx.save();
-  uctx.globalAlpha = b.alpha;
-  uctx.beginPath();
-  uctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-  uctx.strokeStyle = 'rgba(150,220,255,0.8)';
-  uctx.lineWidth = 1;
-  uctx.stroke();
-  // Highlight
-  uctx.beginPath();
-  uctx.arc(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.28, 0, Math.PI * 2);
-  uctx.fillStyle = 'rgba(255,255,255,0.55)';
+  uctx.fillStyle = '#000918';
   uctx.fill();
   uctx.restore();
 }
 
-// ── Main underwater loop ──
+// ── Main deep sea loop ──
 function uwFrame() {
   uwT++;
   uctx.clearRect(0, 0, UW, UH);
 
-  drawCaustics();
+  // Depth vignette
+  const dg = uctx.createLinearGradient(0, 0, 0, UH);
+  dg.addColorStop(0,   'rgba(0,4,18,0.0)');
+  dg.addColorStop(1,   'rgba(0,2,12,0.35)');
+  uctx.fillStyle = dg;
+  uctx.fillRect(0, 0, UW, UH);
 
-  // Update & draw fish
-  uwFish.forEach((f, i) => {
-    f.tailPhase += f.tailSpeed;
-    f.wobblePhase += 0.018;
-    f.x += f.speed * f.dir;
-    f.y += Math.sin(f.wobblePhase) * 0.28;
-    if (f.dir === 1 && f.x > UW + f.size * 6) uwFish[i] = mkUwFish();
-    if (f.dir === -1 && f.x < -f.size * 6) { uwFish[i] = mkUwFish(); uwFish[i].dir = -1; uwFish[i].x = UW + uwFish[i].size * 5; }
-    drawFish(f);
+  uwSilhouettes.forEach((s, i) => {
+    s.wobble += s.wobbleSpeed;
+    s.x += s.speed * s.dir;
+    if (s.dir === 1  && s.x > UW + 150) uwSilhouettes[i] = mkSilhouette();
+    if (s.dir === -1 && s.x < -150)     { uwSilhouettes[i] = mkSilhouette(); uwSilhouettes[i].dir = -1; uwSilhouettes[i].x = UW + 100; }
+    drawSilhouette(s);
   });
 
-  // Update & draw bubbles
-  uwBubbles.forEach((b, i) => {
-    b.wobble += b.wobbleSpeed;
-    b.x += Math.sin(b.wobble) * 0.45;
-    b.y -= b.speed;
-    if (b.y < -20) { uwBubbles[i] = mkUwBubble(); uwBubbles[i].x = Math.random() * UW; }
-    drawUwBubble(b);
+  uwPlankton.forEach(p => {
+    p.phase += p.speed;
+    p.x += p.driftX; p.y += p.driftY;
+    if (p.x < -10) p.x = UW + 10;
+    if (p.x > UW + 10) p.x = -10;
+    if (p.y < -10) p.y = UH + 10;
+    if (p.y > UH + 10) p.y = -10;
+    drawPlankton(p);
+  });
+
+  uwOrbs.forEach(o => {
+    o.phase += o.speed;
+    o.x += o.driftX; o.y += o.driftY;
+    if (o.x < -20) o.x = UW + 20;
+    if (o.x > UW + 20) o.x = -20;
+    if (o.y < -20) o.y = UH + 20;
+    if (o.y > UH + 20) o.y = -20;
+    drawOrb(o);
+  });
+
+  uwJellies.forEach((j, i) => {
+    j.phase += j.pulseSpeed;
+    j.x += j.driftX + Math.sin(uwT * 0.008 + i) * 0.15;
+    j.y -= j.riseSpeed;
+    if (j.y < -j.r * 3) uwJellies[i] = mkJelly();
+    drawJelly(j);
   });
 
   requestAnimationFrame(uwFrame);
 }
+uwResize();
+window.addEventListener('resize', uwResize);
 uwFrame();
 
 // ── Nav scroll state ──
